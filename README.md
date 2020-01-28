@@ -221,3 +221,204 @@ To enable/disable a device, the ```status``` property inside a devicetree node i
 During parsing stage, the devices with ```status``` property set as ```"disabled"``` are skipped and only device with ```status``` set as ```"okay"``` are parsed for further processing.
 
 Moreoever, by default, all the devices present on a SoC are disabled in a SoC dtsi file and each device present on a board based on that SoC should be explicity enabled in the board dts file.
+
+## Supporting a new board
+Normally, a SoC contains many peripherals like ```UART```, ```I2C```, ```SPI``` etc. Each of these peripherals require pins to interface with the physical world. Due to SoC packaging and size constraints, the number of available pins is limited and it might not be possible to allocate pins for all the available peripherals. The solution is ```pin-multiplexing``` or in short ```pinmux```.
+
+### Pinmux
+In pinmux, the SoC's pins are multiplexed between different peripherals or modes. This means that each pin could be connected to a different peripheral based on the pinmux setting. This pin configuration is performed via the ```pinmux controller``` which exposes a register based API to set the mode of the external pins or connect them to one of the intenal peripherals.
+
+These pin ```modes``` are commonly referred to as ```alternate functions``` or ```functions``` and a pin could have multiple modes.
+
+For example, see the below snapshot from *am335x datasheet*: [link](http://www.ti.com/lit/ds/symlink/am3358.pdf)
+
+![pin_modes](images/pin_modes.png)
+
+In the above image, it can be seen that both pins ```GPMC_A4``` and ```GPMC_A5``` can be set into one of the seven available modes (0~6).
+
+### SoC specific dtsi file
+A SoC dtsi file is a generic file and contains the device nodes for all the peripherals available on the chipset. However, it lacks the board specific information like the pinmux setting. As the pinmux setting depends on each individual board, it is defined in the board-specific dts file.
+
+Furthermore, all the peripherals which need pinmux setting are disabled via ```status = "disabled"``` property in the SoC dtsi file. This makes sense as the the devices have to be explictly enabled in the board-specific dts, after specifying their pinmux setting.
+
+### The Pinctrl interface
+To specify the pinmux setting in the board-specific dts file, both Linux and u-boot has a Pinctrl subsystem. This pinctrl API can be used to set the pinmux setting of each pin. Here are the main parts of ```pinctrl API```.
+1. ```pinctrl provider```
+2. ```pinctrl group```
+3. ```pinctrl client```
+
+#### Pinctrl provider
+The pinctrl provider is a devicetree node for the actual pinmux controller on the chipset. It the devicetree node with node name set as ```pin-controller```. For example, for STM32MP1 chipset:
+```
+ykhan@ykhan:~/uboot$ head -n 30 arch/arm/dts/stm32mp157-pinctrl.dtsi
+// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+/*
+ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
+ * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
+ */
+
+#include <dt-bindings/pinctrl/stm32-pinfunc.h>
+
+/ {
+	soc {
+		pinctrl: pin-controller@50002000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "st,stm32mp157-pinctrl";
+			ranges = <0 0x50002000 0xa400>;
+			interrupt-parent = <&exti>;
+			st,syscfg = <&exti 0x60 0xff>;
+			hwlocks = <&hsem 0>;
+			pins-are-numbered;
+
+			gpioa: gpio@50002000 {
+				gpio-controller;
+				#gpio-cells = <2>;
+				interrupt-controller;
+				#interrupt-cells = <2>;
+				reg = <0x0 0x400>;
+				clocks = <&rcc GPIOA>;
+				st,bank-name = "GPIOA";
+				status = "disabled";
+			};
+```
+Each chipset has their own pinctrl provider binding and for above example, the devicetree binding for pinctrl provider has ```compatible = "st,stm32mp157-pinctrl"``` and here is an excerpt from its documentation.
+
+```
+ykhan@ykhan:~/uboot$ grep -snr 'st,stm32mp157-pinctrl' doc/
+doc/device-tree-bindings/pinctrl/st,stm32-pinctrl.txt:16:   "st,stm32mp157-pinctrl"
+
+ykhan@ykhan:~/uboot$ head -n 20  doc/device-tree-bindings/pinctrl/st,stm32-pinctrl.txt
+* STM32 GPIO and Pin Mux/Config controller
+
+STMicroelectronics's STM32 MCUs intregrate a GPIO and Pin mux/config hardware
+controller. It controls the input/output settings on the available pins and
+also provides ability to multiplex and configure the output of various on-chip
+controllers onto these pads.
+
+Pin controller node:
+Required properies:
+ - compatible: value should be one of the following:
+   "st,stm32f429-pinctrl"
+   "st,stm32f469-pinctrl"
+   "st,stm32f746-pinctrl"
+   "st,stm32f769-pinctrl"
+   "st,stm32h743-pinctrl"
+   "st,stm32mp157-pinctrl"
+   "st,stm32mp157-z-pinctrl"
+ - #address-cells: The value of this property must be 1
+ - #size-cells	: The value of this property must be 1
+ - ranges	: defines mapping between pin controller node (parent) to
+```
+Typically, the pinmux functionality is performed by the ```GPIO``` controller i.e. in addition to setting the ```pin I/O mode```, the ```GPIO``` registers can be used to select the pin mode as well. Therefore, its common for the ```GPIO``` controller to be the child of ```pin-contoller``` node.
+
+### Pinctrl group
+A ```pinctrl-group``` is a child node of the ```pin-controller``` node, and represents the mode of a single or group of pins. The format of the ```pinctrl-group``` is specified by its parent ```pin-controller``` device binding. In case of our current STM32MP1 example, it is defined as:
+```
+Contents of function subnode node:
+----------------------------------
+Subnode format
+A pinctrl node should contain at least one subnode representing the
+pinctrl group available on the machine. Each subnode will list the
+pins it needs, and how they should be configured, with regard to muxer
+configuration, pullups, drive, output high/low and output speed.
+
+node {
+	 pinmux = <PIN_NUMBER_PINMUX>;
+   GENERIC_PINCONFIG;
+};
+
+Required properties:
+- pinmux: integer array, represents gpio pin number and mux setting.
+  Supported pin number and mux varies for different SoCs, and are defined in
+  dt-bindings/pinctrl/<soc>-pinfunc.h directly.
+  These defines are calculated as:
+    ((port * 16 + line) << 8) | function
+  With:
+    - port: The gpio port index (PA = 0, PB = 1, ..., PK = 11)
+    - line: The line offset within the port (PA0 = 0, PA1 = 1, ..., PA15 = 15)
+    - function: The function number, can be:
+      * 0 : GPIO
+      * 1 : Alternate Function 0
+      * 2 : Alternate Function 1
+      * 3 : Alternate Function 2
+      * ...
+      * 16 : Alternate Function 15
+      * 17 : Analog
+
+  To simplify the usage, macro is available to generate "pinmux" field.
+  This macro is available here:
+    - include/dt-bindings/pinctrl/stm32-pinfunc.h
+...
+Optional properties:
+- GENERIC_PINCONFIG: is the generic pinconfig options to use.
+  Available options are:
+   - bias-disable,
+   - bias-pull-down,
+   - bias-pull-up,
+   - drive-push-pull,
+   - drive-open-drain,
+   - output-low
+   - output-high
+   - slew-rate = <x>, with x being:
+       < 0 > : Low speed
+       < 1 > : Medium speed
+       < 2 > : Fast speed
+       < 3 > : High speed
+```
+In general, a ```pin-controller``` can have many `pinctrl-groups`, even for the same pins. The presence of ```pinctrl-groups``` under ```pin-controller``` doesn't mean it is activated i.e.  it doesn't reflect the actual mode of the pins. It just serves as a **pool** of all the possible pinmux combinations.
+
+In order to activate a specific ```pinctrl-group```, it must be requested by a ```pinctrl-client``` device node. Here's the example of three ```pinctrl-groups``` for uart4 on STM32MP1 platform. These groups correspond to the normal, idle and sleep state of the uart4 peripheral.
+```
+uart4_pins_a: uart4-0 {
+    pins1 {
+        pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
+        bias-disable;
+        drive-push-pull;
+        slew-rate = <0>;
+    };
+    pins2 {
+        pinmux = <STM32_PINMUX('B', 2, AF8)>; /* UART4_RX */
+        bias-disable;
+    };
+};
+
+uart4_idle_pins_a: uart4-idle-0 {
+    pins1 {
+        pinmux = <STM32_PINMUX('G', 11, ANALOG)>; /* UART4_TX */
+    };
+    pins2 {
+        pinmux = <STM32_PINMUX('B', 2, AF8)>; /* UART4_RX */
+        bias-disable;
+    };
+};
+
+uart4_sleep_pins_a: uart4-sleep-0 {
+    pins {
+        pinmux = <STM32_PINMUX('G', 11, ANALOG)>, /* UART4_TX */
+                <STM32_PINMUX('B', 2, ANALOG)>; /* UART4_RX */
+        };
+};
+```
+#### Pinctrl client
+The `pinctrl-client` is a device node, which activates a `pinctrl-group` configuration via it's ```pinctrl-<num>``` property. The ```pinctrl-X``` refers to the ```phandle``` of the ```pinctrl-group```, which is specified by referring to the label of the corresponding ```pinctrl-group```. *See generating the phandle from label under the section "Label" above*.
+
+ Usually the ```pinctrl-0``` is the default ```pinctrl-group```, that is activated as the driver for the `pinctrl-client` device loads (probe method of the driver is called). A device may activate different ```pinctrl-groups``` under different conditions. Therefore, it has to specify list of all the possible pinmux setting it might required via ```pinctrl-1```, ```pinctrl-2``` upto```pinctrl-N``` properties. The number ```N``` depends on the pinctrl client driver.
+
+ Building up on the current STM32M1 example, here's the ```pinctrl-client``` node for the ```UART4```, requesting three ```pin-groups```, one for each normal, idle and sleep state.
+```
+&uart4 {
+        pinctrl-names = "default", "sleep", "idle", "no_console_suspend";
+        pinctrl-0 = <&uart4_pins_a>;
+        pinctrl-1 = <&uart4_sleep_pins_a>;
+        pinctrl-2 = <&uart4_idle_pins_a>;
+        pinctrl-3 = <&uart4_pins_a>;
+        status = "okay";
+};
+```
+Notice the ```pinctrl-names``` property above, this creates a mapping between a human readable string and a pinctrl id. For example, the driver can use string ```"sleep"```, to activate the ```pinctrl-1``` setting. For example, here is the function call in u-boot to activate the ```pinctrl-0``` ```pinctrl-group``` by using name ```"default"```.
+```
+// in function device_probe() in file drivers/core/device.c
+pinctrl_select_state(dev, "default");
+```
+### Customizing Pinmux
