@@ -1,0 +1,12 @@
+/dts-v1/;
+
+/ {
+	device_a: device_a {
+		property-1 = "xyz";
+	};
+
+	device_b {
+		device-parent = <&device_a>; // label to phandle
+		device-parent-path =  &device_a; // label to fullpath
+	};
+};
