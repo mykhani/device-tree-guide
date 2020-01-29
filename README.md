@@ -1,11 +1,11 @@
 # Devicetree Guide
-A devicetree is a tree based data structure containing nodes, which desribe the overall system and the physical devices, present on a computing platform (Beaglebone, RapberryPi etc).
+A devicetree is a tree based data structure containing nodes, which describe the overall system and the physical devices, present on the hardware platform (Beaglebone, RaspberryPi etc).
 
-Both Linux and uboot follows the same devictree format to specify the hardware.
+Both Linux and u-boot follow the same devicetree format to specify the hardware.
 
 ## Devicetree basics
 #### Format
-Here's the basic format of the device tree file.
+Here's the basic format of a device tree file.
 ```
 /dts-v1/;
 
@@ -22,22 +22,24 @@ Here's the basic format of the device tree file.
 ~
 ```
 #### Root node
-The root node is the starting point of the devicetree's tree structure. It is denoted by ```/ {}```. Each devicetree should have a single root node, which contains all other nodes.
+The root node is the starting point of the devicetree's tree structure. It is marked by ```/ {}```. Each devicetree should have a single root node, which contains all other nodes.
 
 #### Device node
-A device node is of the following form:
+A device node has the following format:
 ```
 label: node_name@node_address {
     /* properties */
 };
 ```
-#### Label
-The label of the devicetree nodes serve its purpose during devicetree compilation. Depending on the context, a label could be used to generate either full devicetree node path or device phandle.
+The description of the each node element follows.
 
-* ##### Generating the full devicetree path from label
+#### Label
+The label of the devicetree nodes help during devicetree compilation. Depending on the context, a label could be used to generate either full ```device node path``` or ```device phandle```.
+
+##### Generating the full devicetree path from label
 When a label is referenced with ```&``` in ```aliases``` node or some other device node without ```<>```.
 
-* ##### Generating the devicetree phandle from label
+##### Generating the devicetree phandle from label
 When a label is referenced with ```&``` inside ```<>```.
 
 See the below example to see both path and phandle generation from the label.
@@ -79,20 +81,20 @@ The node name serves as an unique identifier for the specfic devicetree node.
 #### Node address
 The node address is appended to the node name after ```&```. Usually it is equal to the base address of the device registers e.g. ```uart base reg address```.
 
-**The main purpose of the node address is for debugging and other devicetree utilties. For devices without base register, these addresses could be set to any unique numerical values.**
+**The main purpose of the node address is for debugging and other devicetree utilties. For devices without actual base register, the node address can be ommitted or set to some arbitrary unique numerical value.**
 
 #### Phandle
-The phandle property of a devicetree node is a numerical identifier, which can be used to reference this node from other devicetree nodes.
+The phandle property of a devicetree node is a numerical identifier, which can be used to reference it node from other devicetree nodes.
 
-**Note: the phandle property is not specified inside the devicetree sources, instead, it is generated automatically by the devicetree compiler during compilation.**
+**Note: the phandle property is not specified inside the devicetree source files, instead, it is generated automatically by the devicetree compiler during compilation.**
 
 See the above example in sub-section "Label", where ```device_b``` is referring to its parent ```device_a``` via ```device-parent = <0x1>```, where ```<0x1>``` is the phandle of ```device_a```.
 
 #### Properties
-A device node can have single or array of numerical and string properties. Except few standard properties like ```compatible``` and ```status```, the meaning of the rest of the properties depends on a given devicetree binding.
+A device node can have ```single``` or ```array``` of ```numerical``` and ```string``` properties. Except few standard properties like ```compatible``` and ```status```, the meaning of the rest of the properties depends on a given devicetree binding.
 
 #### Device tree binding
-A devicetree binding is a standardized device tree node for a specific device. For example, below is the devicetree binding for the *STMicroelectronics USART*.
+A devicetree binding is a standardized device tree node for a specific device. For example, below is the devicetree binding for the ```STMicroelectronics USART```.
 ```
 * STMicroelectronics STM32 USART
 
@@ -128,9 +130,9 @@ Optional properties:
 - interrupt-names : Should contain "wakeup" if optional wake-up interrupt is
   used.
 ```
-In short, whenever a standardized device tree node is specified for a new device, it is called a device tree binding and all of the properties and their meaning should be documented.
+In short, whenever a standardized device tree node is designed for a new device, it is called a device tree binding for that device and all of the properties and their meaning should be documented.
 
-To find the documentation of a certain devicetree binding, ```grep``` the ```compatible``` string property in the ```doc``` directory of the sources.
+To find the documentation of a certain devicetree binding, ```grep``` the string in the ```compatible``` property, inside the ```doc``` directory of the sources.
 
 *example*
 ```
@@ -139,12 +141,16 @@ doc/device-tree-bindings/serial/st,stm32-usart.txt:7:  - "st,stm32h7-uart".
 ```
 
 #### .dtsi files
-By convention, the devicetree source follows a certain hierarchy of devicetree include (.dtsi) and devicetree source (.dts) files. The dtsi files contains generic/ common data, that could be shared among many dts files. Each dts file include one or many dtsi files and make changes specific to that dts file. A bare minimum example of this heirarchy is the one consisting of a SoC based dtsi file and actual board based board.dts file.
+By convention, the devicetree source follows a certain hierarchy of devicetree include (.dtsi) and devicetree source (.dts) files. 
+
+The dtsi files contains generic/ common data, that can be shared among many dts files. Each dts file include one or many dtsi files and make changes specific to that dts file. 
+
+A bare minimum example of this heirarchy is the one consisting of a SoC based dtsi file and actual board based board.dts file.
 
 *soc.dtsi*
 ```
 /*
-  Define the nodes for all the available devices on this chipset.
+  Define the nodes for all of the available devices on this chipset.
   Mark them disabled by default as not all of them could be supported
   by the actual board, based on this chipset.
 */
@@ -173,7 +179,7 @@ A dts file could also ```#include``` another dts file, if the board is similar t
 ```
 
 #### Device tree include
-When a dtsi file is included in a dts file, the entire content of dtsi file is copied in the dts file. Based on the requirements, the dts file can add, remove modify or overwrite the nodes defined in the dtsi files.
+When a dtsi file is included in a dts file, the entire content of dtsi file is copied in the dts file. Based on the requirements, the dts file can add, remove, modify or overwrite the nodes defined in the dtsi files.
 
 See the below image for an example of dtsi being included in the board specific dts file.
 
@@ -206,7 +212,7 @@ To enable/disable a device, the ```status``` property inside a devicetree node i
 
 During parsing stage, the devices with ```status``` property set as ```"disabled"``` are skipped and only device with ```status``` set as ```"okay"``` are parsed for further processing.
 
-Moreoever, by default, all the devices present on a SoC are disabled in a SoC dtsi file and each device present on a board based on that SoC should be explicity enabled in the board dts file.
+Moreoever, some of the the SoC devices depending on the pinmux setting (explained later) are disabled in the SoC dtsi file and need to be explicity enabled in the board-specific dts file, based on that SoC.
 
 ## Compiling a Devicetree
 To compile a devicetree file (.dts), a dtc compiler is used which generates the output devicetree blob file (.dtb).
@@ -229,20 +235,20 @@ $ dtc -I dtb -O dts -o out.dts input.dtb
 Normally, a SoC contains many peripherals like ```UART```, ```I2C```, ```SPI``` etc. Each of these peripherals require pins to interface with the physical world. Due to SoC packaging and size constraints, the number of available pins is limited and it might not be possible to allocate pins for all the available peripherals. The solution is ```pin-multiplexing``` or in short ```pinmux```.
 
 #### Pinmux
-In pinmux, the SoC's pins are multiplexed between different peripherals or modes. This means that each pin could be connected to a different peripheral based on the pinmux setting. This pin configuration is performed via the ```pinmux controller``` which exposes a register based API to set the mode of the external pins or connect them to one of the intenal peripherals.
+In pinmux, the SoC's pins are multiplexed between different peripherals or modes. This means that each pin could be connected to a different peripheral based on the pinmux setting. This pin configuration is performed via the ```pinmux controller``` which exposes a register based API to set the mode of the external pins or connect them to one of the internal peripherals.
 
 These pin ```modes``` are commonly referred to as ```alternate functions``` or ```functions``` and a pin could have multiple modes.
 
-For example, see the below snapshot from *am335x datasheet*: [link](http://www.ti.com/lit/ds/symlink/am3358.pdf)
+For example, see the below snapshot from ```am335x datasheet```: [link](http://www.ti.com/lit/ds/symlink/am3358.pdf)
 
 ![pin_modes](images/pin_modes.png)
 
-In the above image, it can be seen that both pins ```GPMC_A4``` and ```GPMC_A5``` can be set into one of the seven available modes (0~6).
+In the above image, it can be seen that both pins ```GPMC_A4``` and ```GPMC_A5``` can be set into one of the seven available modes ```(0~6)```.
 
 #### SoC specific dtsi file
 A SoC dtsi file is a generic file and contains the device nodes for all the peripherals available on the chipset. However, it lacks the board specific information like the pinmux setting. As the pinmux setting depends on each individual board, it is defined in the board-specific dts file.
 
-Furthermore, all the peripherals which need pinmux setting are disabled via ```status = "disabled"``` property in the SoC dtsi file. This makes sense as the the devices have to be explictly enabled in the board-specific dts, after specifying their pinmux setting.
+Furthermore, all the peripherals which need pinmux setting are disabled via ```status = "disabled"``` property in the SoC dtsi file. This makes sense as the the devices need to be explictly enabled in the board-specific dts, after specifying their pinmux setting.
 
 #### The Pinctrl interface
 To specify the pinmux setting in the board-specific dts file, both Linux and u-boot has a Pinctrl subsystem. This pinctrl API can be used to set the pinmux setting of each pin. Here are the main parts of ```pinctrl API```.
@@ -251,7 +257,7 @@ To specify the pinmux setting in the board-specific dts file, both Linux and u-b
 3. ```pinctrl-client```
 
 ##### Pinctrl-provider
-The pinctrl provider is a devicetree node for the actual pinmux controller on the chipset. It the devicetree node with node name set as ```pin-controller```. For example, for STM32MP1 chipset:
+The pinctrl provider is a devicetree node for the actual pinmux controller on the chipset. It the devicetree node with node name set as ```pin-controller```. For example, for ```STM32MP1``` chipset:
 
 ```
 ykhan@ykhan:~/uboot$ head -n 30 arch/arm/dts/stm32mp157-pinctrl.dtsi
@@ -286,6 +292,7 @@ ykhan@ykhan:~/uboot$ head -n 30 arch/arm/dts/stm32mp157-pinctrl.dtsi
 				status = "disabled";
 			};
 ```
+
 Each chipset has their own pinctrl provider binding and for above example, the devicetree binding for pinctrl provider has ```compatible = "st,stm32mp157-pinctrl"``` and here is an excerpt from its documentation.
 
 ```
@@ -317,7 +324,7 @@ Required properies:
 Typically, the pinmux functionality is performed by the ```GPIO``` controller i.e. in addition to setting the ```pin I/O mode```, the ```GPIO``` registers can be used to select the pin mode as well. Therefore, its common for the ```GPIO``` controller to be the child of ```pin-contoller``` node.
 
 ##### Pinctrl-group
-A ```pinctrl-group``` is a child node of the ```pin-controller``` node, and represents the mode of a single or group of pins. The format of the ```pinctrl-group``` is specified by its parent ```pin-controller``` device binding. In case of our current STM32MP1 example, it is defined as:
+A ```pinctrl-group``` is a child node of the ```pin-controller``` node, and represents the mode of a single or group of pins. The format of the ```pinctrl-group``` is specified by its parent ```pin-controller``` device binding. In case of our current ```STM32MP1``` example, it is defined as:
 ```
 Contents of function subnode node:
 ----------------------------------
@@ -370,9 +377,9 @@ Optional properties:
        < 2 > : Fast speed
        < 3 > : High speed
 ```
-In general, a ```pin-controller``` can have many `pinctrl-groups`, even for the same pins. The presence of ```pinctrl-groups``` under ```pin-controller``` doesn't mean it is activated i.e.  it doesn't reflect the actual mode of the pins. It just serves as a **pool** of all the possible pinmux combinations.
+In general, a ```pin-controller``` can have many `pinctrl-groups`, even for the same pins. The presence of ```pinctrl-groups``` under ```pin-controller``` doesn't mean it is activated i.e.  it doesn't reflect the actual mode of the pins. It just serves as a ``pool`` of all the possible pinmux combinations.
 
-In order to activate a specific ```pinctrl-group```, it must be requested by a ```pinctrl-client``` device node. Here's the example of three ```pinctrl-groups``` for uart4 on STM32MP1 platform. These groups correspond to the normal, idle and sleep state of the uart4 peripheral.
+In order to activate a specific ```pinctrl-group```, it must be requested by a ```pinctrl-client``` device node. Here's the example of three ```pinctrl-groups``` to be reserved for the ```UART4``` device on ```STM32MP1``` platform. These groups correspond to the ```normal```, ```idle``` and ```sleep``` state of the ```UART4``` peripheral.
 ```
 uart4_pins_a: uart4-0 {
     pins1 {
@@ -405,11 +412,11 @@ uart4_sleep_pins_a: uart4-sleep-0 {
 };
 ```
 ##### Pinctrl-client
-The `pinctrl-client` is a device node, which activates a `pinctrl-group` configuration via it's ```pinctrl-<num>``` property. The ```pinctrl-X``` refers to the ```phandle``` of the ```pinctrl-group```, which is specified by referring to the label of the corresponding ```pinctrl-group```. *See generating the phandle from label under the section "Label" above*.
+The `pinctrl-client` is a device node, which activates a `pinctrl-group` configuration via it's ```pinctrl-<num>``` property. The ```pinctrl-X``` refers to the ```phandle``` of the ```pinctrl-group```, which is specified by referring to the ```label``` of the corresponding ```pinctrl-group```. *See generating the phandle from label under the section "Label" above*.
 
- Usually the ```pinctrl-0``` is the default ```pinctrl-group```, that is activated as the driver for the `pinctrl-client` device loads (probe method of the driver is called). A device may activate different ```pinctrl-groups``` under different conditions. Therefore, it has to specify list of all the possible pinmux setting it might required via ```pinctrl-1```, ```pinctrl-2``` upto```pinctrl-N``` properties. The number ```N``` depends on the pinctrl client driver.
+ Usually the ```pinctrl-0``` is the default ```pinctrl-group```, that is activated as soon the driver for the `pinctrl-client` device loads (```probe``` method of the driver is called). A device may activate more than single ```pinctrl-group```, one for each different state. Therefore, it has to specify list of all the possible pinmux settings it might require via ```pinctrl-1```, ```pinctrl-2``` upto```pinctrl-N``` properties. The number ```N``` depends on the number of states of the ```pinctrl-client``` driver.
 
- Building up on the current STM32M1 example, here's the ```pinctrl-client``` node for the ```UART4```, requesting three ```pin-groups```, one for each normal, idle and sleep state.
+Building up on the current ```STM32MP1``` example, here's the ```pinctrl-client``` node for the ```UART4```, requesting three ```pin-groups```, one for each ```normal```, ```idle``` and ```sleep``` state.
 ```
 &uart4 {
         pinctrl-names = "default", "sleep", "idle", "no_console_suspend";
@@ -420,13 +427,13 @@ The `pinctrl-client` is a device node, which activates a `pinctrl-group` configu
         status = "okay";
 };
 ```
-Notice the ```pinctrl-names``` property above, this creates a mapping between a human readable string and a pinctrl id. For example, the driver can use string ```"sleep"```, to activate the ```pinctrl-1``` setting. For example, here is the function call in u-boot to activate the ```pinctrl-0``` ```pinctrl-group``` by using name ```"default"```.
+Notice the ```pinctrl-names``` property above, this creates a mapping between a human readable string and a ```pinctrl``` id. For example, the driver can use string ```"sleep"```, to activate the ```pinctrl-1``` setting. For example, here is the function call in u-boot to activate the ```pinctrl-0``` ```pinctrl-group``` by using the string ```"default"```.
 ```
 // in function device_probe() in file drivers/core/device.c
 pinctrl_select_state(dev, "default");
 ```
 #### Adding pinctrl-groups
-In most cases, the ```pinctrl-groups``` defined under the ```pin-controller``` node should be sufficient. However, if the existing ```pinctrl-groups``` doesn't meet the requirement and a new ```pinctrl-group``` is needed, it can be done by adding a new ```pinctrl-group``` to the ```pin-controller``` in the board-specific dts file as follows.
+In most cases, the ```pinctrl-groups``` defined under the ```pin-controller``` node should be sufficient. However, if the existing ```pinctrl-groups``` do not meet the requirement and a new ```pinctrl-group``` is needed, it can be done by adding a new ```pinctrl-group``` to the ```pin-controller``` in the board-specific dts file as follows.
 ```
 &pinctrl {
     pinctrl-group-custom_1: custom_pins_1 {
@@ -442,7 +449,7 @@ In most cases, the ```pinctrl-groups``` defined under the ```pin-controller``` n
     };
 };
 ```
-While adding extra ```pinctrl-groups```, make sure the same pins are not being in any other ```pinctrl-group```. Otherwise it might result in a conflict and the pins could be in the unexpected mode if two different ```pinctrl-client``` devices activate conflicting ```pinctrl-groups```. At times,it might be required to explicity ```disable``` the device node making use of the conflicting ```pinctrl-groups```.
+While adding extra ```pinctrl-groups```, make sure the same pins are not being in any other ```pinctrl-group```. Otherwise it could cause a conflict and the pins could be in the unexpected mode, if any two different ```pinctrl-client``` devices activate the conflicting ```pinctrl-groups```. At times,it might be required to explicity ```disable``` the device node making use of the conflicting ```pinctrl-groups```.
 
 #### Enabling a device
 As mentioned above, the SoC specific dtsi files contains many devices which are ```disabled``` by default because they depend on the final pinmux setting in the board-specific dts file.
@@ -468,7 +475,7 @@ As mentioned earlier, a ```pinctrl-group``` becomes active only as the correspon
 
 In other words, the system's pinmux state depends on which drivers have been loaded or activated.
 
-If there's a requirement that system pins need to be in a certain default state on boot, irrespective of the drivers loaded, then there is a little trick for it.
+If there's a requirement that system pins need to be in a certain default state on boot, irrespective of the number of drivers loaded, then there is a little trick for it.
 
 This can be done by defining a new ```pinctrl-group``` that consists of all the static pins and setting the ```pin-controller``` node as the ```pinctrl-client``` of itself. For example:
 ```
@@ -482,3 +489,4 @@ This can be done by defining a new ```pinctrl-group``` that consists of all the 
     };
 };
 ```
+This will ensure that the pins are set to the mode specified by ```static_pins_grp``` on system boot.
